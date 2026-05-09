@@ -58,7 +58,10 @@ export default function Login({ setUser }) {
     setErrorMsg('');
 
     try {
-      const endpoint = step === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+      const endpoint =
+  step === 'signup'
+    ? 'https://attendx-6ksy.onrender.com/api/auth/signup'
+    : 'https://attendx-6ksy.onrender.com/api/auth/login';
       const payload = { email, password, role, name };
       if (role === 'student') {
         payload.roll_number = rollNumber;

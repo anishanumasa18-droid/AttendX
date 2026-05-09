@@ -13,6 +13,7 @@ export default function FaceScan({ userEmail }) {
   const [devices, setDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [retryCount, setRetryCount] = useState(0);
+  const [sessionId, setSessionId] = useState('');
 const [alreadyMarked, setAlreadyMarked] = useState(false);
 const [attendanceSuccess, setAttendanceSuccess] = useState(false);
   useEffect(() => {
@@ -49,7 +50,7 @@ const checkAttendanceStatus = async () => {
    try {
 
       const res = await fetch(
-         `/api/check_attendance_status?session_id=${sessionId}&student_email=${studentEmail}`
+         `https://attendx-6ksy.onrender.com/api/check_attendance_status?session_id=${sessionId}&student_email=${userEmail}`
       )
 
       const data = await res.json()
@@ -81,7 +82,7 @@ const checkAttendanceStatus = async () => {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
       setStatus('verifying');
       try {
-        const res = await fetch('/api/verify/face_precheck', {
+        const res = await fetch('https://attendx-6ksy.onrender.com/api/verify/face_precheck', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ student_id: userEmail, face_image_b64: dataUrl })
@@ -194,9 +195,12 @@ stopFrontCamera();
               onScan={async (result) => {
                 if (result && result.length > 0) {
                   const qrToken = result[0].rawValue;
+                  const payload = JSON.parse(atob(qrToken.split('.')[1]));
+
+setSessionId(payload.session_id);
                   setStatus('verifying');
                   try {
-                    const res = await fetch('/api/verify/qr_scan', {
+                    const res = await fetch('https://attendx-6ksy.onrender.com/api/verify/qr_scan', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ qr_token: qrToken, student_id: userEmail, face_match_score: 0.99 })

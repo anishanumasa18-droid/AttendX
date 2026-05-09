@@ -26,7 +26,7 @@ export default function SessionMonitor() {
 }, [sessionId, isActive])
   useEffect(() => {
     const courseCode = id.split('-')[0] === 'course' ? 'CN' : id;
-    fetch('/api/sessions/create', {
+    fetch('https://attendx-6ksy.onrender.com/api/sessions/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ course_id: courseCode, class_number: 1, duration_minutes: 5 })
@@ -46,10 +46,10 @@ export default function SessionMonitor() {
   useEffect(() => {
     if (!sessionId || !isActive) return;
     const interval = setInterval(() => {
-      fetch(`/api/sessions/${sessionId}/scans`)
-        .then(res => res.json())
-        .then(data => setScannedStudents(data))
-        .catch(err => console.error("Poll error", err));
+     fetch(`https://attendx-6ksy.onrender.com/api/sessions/${sessionId}/scans`)
+  .then(res => res.json())
+  .then(data => setScannedStudents(data))
+  .catch(err => console.error("Poll error", err));
     }, 2000);
     return () => clearInterval(interval);
   }, [sessionId, isActive]);
@@ -72,7 +72,7 @@ export default function SessionMonitor() {
    try {
 
       const res = await fetch(
-         `/api/sessions/${sessionId}/refresh_qr`
+         `https://attendx-6ksy.onrender.com/api/sessions/${sessionId}/refresh_qr`
       )
 
       const data = await res.json()
@@ -92,7 +92,7 @@ export default function SessionMonitor() {
   const handleEndSession = () => {
     setIsActive(false);
     if (sessionId) {
-      fetch(`/api/sessions/${sessionId}/close`, { method: 'POST' }).catch(err => console.error("Close error", err));
+      fetch(`https://attendx-6ksy.onrender.com/api/sessions/${sessionId}/close`, { method: 'POST' }).catch(err => console.error("Close error", err));
     }
   };
 
