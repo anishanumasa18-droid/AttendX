@@ -1,0 +1,13 @@
+fastapi>=0.110.0
+python-jose[cryptography]>=3.3.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.1
+qrcode>=7.4.2
+python-multipart>=0.0.9
+pillow>=10.2.0
+PyJWT>=2.8.0
+deepface
+opencv-python-headless
+tf-keras
+numpy
+uvicorn
