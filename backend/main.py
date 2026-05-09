@@ -221,8 +221,46 @@ class LoginRequest(BaseModel):
 
 @app.post("/api/auth/signup")
 def signup(req: SignupRequest):
-    # Bypass Supabase for dataset mode
-    return {"message": "Signup successful (Dataset Mode)", "user_id": "local_user_123", "role": req.role}
+
+    if req.role == "student":
+
+        new_student = {
+            "Name": req.name,
+            "Institutional Email": req.email,
+            "Roll Number": req.roll_number,
+            "Branch": req.branch,
+            "Section": "A",
+            "Semester": 2,
+            "OS Attendance (2 Months)": "0/0 (0%)",
+            "CN Attendance (2 Months)": "0/0 (0%)",
+            "JAVA Attendance (2 Months)": "0/0 (0%)"
+        }
+
+        student_data.append(new_student)
+
+        save_student_data()
+
+    elif req.role == "faculty":
+
+        new_faculty = {
+            "Name": req.name,
+            "Institutional Email": req.email,
+            "Active Courses": "OS,CN,JAVA"
+        }
+
+        faculty_data.append(new_faculty)
+
+        faculty_data_path = os.path.join(BASE_DIR, 'data_faculty.json')
+
+        with open(faculty_data_path, 'w') as f:
+            json.dump(faculty_data, f, indent=4)
+
+    return {
+        "message": "Signup successful",
+        "role": req.role,
+        "email": req.email,
+        "user_id": "local_user"
+    }
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
