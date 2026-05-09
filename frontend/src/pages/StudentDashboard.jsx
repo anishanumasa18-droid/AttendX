@@ -14,7 +14,7 @@ export default function StudentDashboard({ userEmail }) {
 
   const fetchStudentData = () => {
     setLoading(true);
-    fetch(`/api/student/me?email=${encodeURIComponent(userEmail)}`)
+    fetch(`https://attendx-6ksy.onrender.com/api/student/me?email=${encodeURIComponent(userEmail)}`)
       .then(res => res.json())
       .then(data => {
         setStudent(data);
@@ -61,7 +61,7 @@ export default function StudentDashboard({ userEmail }) {
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
     try {
-      const res = await fetch('/api/register_face', {
+      const res = await fetch('https://attendx-6ksy.onrender.com/api/register_face', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: userEmail, face_image_b64: dataUrl })

@@ -32,10 +32,13 @@ export default function SessionMonitor() {
       body: JSON.stringify({ course_id: courseCode, class_number: 1, duration_minutes: 5 })
     })
     .then(res => res.json())
-    .then(data => {
-      setQrToken(data.qr_token);
-      setSessionId(data.session_id);
-      setLoading(false);
+.then(data => {
+  setQrToken(data.qr_token);
+  setSessionId(data.session_id);
+
+  localStorage.setItem("sessionId", data.session_id);
+
+  setLoading(false);
     })
     .catch(err => {
       console.error("Failed to generate session", err);

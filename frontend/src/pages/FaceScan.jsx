@@ -5,6 +5,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 
 export default function FaceScan({ userEmail }) {
   const navigate = useNavigate();
+  const sessionId = localStorage.getItem("sessionId");
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [status, setStatus] = useState('idle');

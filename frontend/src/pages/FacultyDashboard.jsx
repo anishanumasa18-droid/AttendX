@@ -8,7 +8,7 @@ export default function FacultyDashboard({ userEmail }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/faculty/me?email=${encodeURIComponent(userEmail)}`)
+    fetch(`https://attendx-6ksy.onrender.com/api/faculty/me?email=${encodeURIComponent(userEmail)}`)
       .then(res => res.json())
       .then(data => {
         setFaculty(data);
