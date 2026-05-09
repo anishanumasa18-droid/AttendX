@@ -376,7 +376,6 @@ def verify_face_precheck(req: VerifyFacePrecheckRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/api/sessions/create")
 def create_session(req: SessionCreateRequest):
     now = datetime.now(timezone.utc)
@@ -494,6 +493,11 @@ def check_attendance_status(session_id: str, student_email: str):
     return {
         "already_marked": already
     }
+@app.get("/test_refresh")
+def test_refresh():
+    return {"message": "refresh route working"}
+
+
 @app.post("/api/verify/qr_scan")
 def verify_qr_scan(req: QrScanRequest):
 
