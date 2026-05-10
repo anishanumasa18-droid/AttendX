@@ -184,48 +184,78 @@ stopFrontCamera();
             <Scanner
               key={`${selectedDeviceId}-${retryCount}`}
               onScan={async (result) => {
-                if (result && result.length > 0) {
-                  const qrToken = result[0].rawValue;
-                  setStatus('verifying');
-                  try {
-                    const res = await fetch('https://attendx-6ksy.onrender.com/api/verify/qr_scan', {
-   method: 'POST',
-   headers: { 'Content-Type': 'application/json' },
-   body: JSON.stringify({
-      qr_token: qrToken,
-      student_id: userEmail,
-      face_match_score: 0.99
-   })
-});
 
-const data = await res.json();
+   if (!result || result.length === 0) return;
 
-if (!res.ok) {
+   try {
 
-   if(res.status === 409) {
+      const qrToken = result[0].rawValue;
 
-      alert("Attendance already marked");
+      setStatus('verifying');
 
-      setAlreadyMarked(true);
+      const res = await fetch(
+         'https://attendx-6ksy.onrender.com/api/verify/qr_scan',
+         {
+            method: 'POST',
+            headers: {
+               'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+               qr_token: qrToken,
+               student_id: userEmail,
+               face_match_score: 0.99
+            })
+         }
+      );
 
-      stopFrontCamera();
+      const data = await res.json();
 
-      return;
+      // SUCCESS
+      if (res.ok) {
+
+         alert("Attendance marked successfully");
+
+         setStatus('attendance_marked');
+
+         stopFrontCamera();
+
+         setTimeout(() => {
+            navigate('/student');
+         }, 2500);
+
+         return;
+      }
+
+      // ALREADY MARKED
+      if (res.status === 409) {
+
+         alert("Attendance already marked");
+
+         setAlreadyMarked(true);
+
+         stopFrontCamera();
+
+         return;
+      }
+
+      // OTHER ERRORS
+      alert(data.detail || "QR verification failed");
+
+      setQrError(data.detail || "QR verification failed");
+
+      setStatus('scanning_qr');
+
+   } catch (err) {
+
+      console.error(err);
+
+      alert("Scan failed");
+
+      setQrError(err.message);
+
+      setStatus('scanning_qr');
    }
-
-   throw new Error(data.detail || 'QR verification failed');
-}
-
-alert("Attendance marked successfully");
-
-setStatus('attendance_marked');
-
-setTimeout(() => navigate('/student'), 2500);
-
-return;
-                  } catch (err) { setQrError(`Signature mismatch: ${err.message}`); setStatus('scanning_qr'); }
-                }
-              }}
+}}
               onError={(error) => { if (error?.name !== 'NotFoundException') setQrError(`Optical Error: ${error.message}`); }}
               constraints={selectedDeviceId ? { deviceId: selectedDeviceId } : { facingMode: 'environment' }} 
               components={{ audio: false, finder: true }}
