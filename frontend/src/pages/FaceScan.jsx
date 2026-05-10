@@ -15,7 +15,6 @@ export default function FaceScan({ userEmail }) {
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [retryCount, setRetryCount] = useState(0);
 const [alreadyMarked, setAlreadyMarked] = useState(false);
-const [attendanceSuccess, setAttendanceSuccess] = useState(false);
   useEffect(() => {
     let localStream = null;
     async function startCamera() {
@@ -57,10 +56,12 @@ if (!sessionId) return;
 
       if(data.already_marked) {
 
-         setAlreadyMarked(true)
+   alert("Attendance already marked");
 
-         stopFrontCamera()
-      }
+   setAlreadyMarked(true);
+
+   stopFrontCamera();
+}
 
    } catch(err) {
       console.error(err)
@@ -88,17 +89,7 @@ if (!sessionId) return;
           body: JSON.stringify({ student_id: userEmail, face_image_b64: dataUrl })
         });
         const data = await res.json();
-        if(res.status === 409) {
-
-   setAlreadyMarked(true)
-
-   stopFrontCamera()
-
-   return
-}
         if (!res.ok) throw new Error(data.detail || 'Verification failed');
-        setAttendanceSuccess(true);
-
 stopFrontCamera();
         setStatus('success');
       } catch (err) {
@@ -195,17 +186,43 @@ stopFrontCamera();
               onScan={async (result) => {
                 if (result && result.length > 0) {
                   const qrToken = result[0].rawValue;
-                  const payload = JSON.parse(atob(qrToken.split('.')[1]));
                   setStatus('verifying');
                   try {
                     const res = await fetch('https://attendx-6ksy.onrender.com/api/verify/qr_scan', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ qr_token: qrToken, student_id: userEmail, face_match_score: 0.99 })
-                    });
-                    if (!res.ok) throw new Error('QR signature mismatch');
-                    setStatus('attendance_marked');
-                    setTimeout(() => navigate('/student'), 2500);
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({
+      qr_token: qrToken,
+      student_id: userEmail,
+      face_match_score: 0.99
+   })
+});
+
+const data = await res.json();
+
+if (!res.ok) {
+
+   if(res.status === 409) {
+
+      alert("Attendance already marked");
+
+      setAlreadyMarked(true);
+
+      stopFrontCamera();
+
+      return;
+   }
+
+   throw new Error(data.detail || 'QR verification failed');
+}
+
+alert("Attendance marked successfully");
+
+setStatus('attendance_marked');
+
+setTimeout(() => navigate('/student'), 2500);
+
+return;
                   } catch (err) { setQrError(`Signature mismatch: ${err.message}`); setStatus('scanning_qr'); }
                 }
               }}

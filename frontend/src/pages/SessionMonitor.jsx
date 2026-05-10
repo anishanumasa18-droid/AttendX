@@ -19,7 +19,7 @@ export default function SessionMonitor() {
          refreshQRCode()
       }
 
-   }, 3000)
+   }, 7000)
 
    return () => clearInterval(qrInterval)
 
@@ -29,7 +29,7 @@ export default function SessionMonitor() {
     fetch('https://attendx-6ksy.onrender.com/api/sessions/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ course_id: courseCode, class_number: 1, duration_minutes: 5 })
+      body: JSON.stringify({ course_id: courseCode, class_number: 1, duration_minutes: 3 })
     })
     .then(res => res.json())
 .then(data => {
