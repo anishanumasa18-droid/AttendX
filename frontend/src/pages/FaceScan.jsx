@@ -5,6 +5,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 
 export default function FaceScan({ userEmail }) {
   const navigate = useNavigate();
+  const sessionId = localStorage.getItem("sessionId");
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [status, setStatus] = useState('idle');
@@ -13,7 +14,6 @@ export default function FaceScan({ userEmail }) {
   const [devices, setDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [retryCount, setRetryCount] = useState(0);
-  const [sessionId, setSessionId] = useState('');
 const [alreadyMarked, setAlreadyMarked] = useState(false);
 const [attendanceSuccess, setAttendanceSuccess] = useState(false);
   useEffect(() => {
@@ -196,8 +196,6 @@ stopFrontCamera();
                 if (result && result.length > 0) {
                   const qrToken = result[0].rawValue;
                   const payload = JSON.parse(atob(qrToken.split('.')[1]));
-
-setSessionId(payload.session_id);
                   setStatus('verifying');
                   try {
                     const res = await fetch('https://attendx-6ksy.onrender.com/api/verify/qr_scan', {
