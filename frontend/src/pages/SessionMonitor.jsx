@@ -10,7 +10,7 @@ export default function SessionMonitor() {
   const [qrToken, setQrToken] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [loading, setLoading] = useState(true);
-  const [scannedStudents, setScannedStudents] = useState([]);
+  const [liveScans, setLiveScans] = useState([]);
   useEffect(() => {
 
    const qrInterval = setInterval(() => {
@@ -29,17 +29,20 @@ export default function SessionMonitor() {
     fetch('https://attendx-6ksy.onrender.com/api/sessions/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ course_id: courseCode, class_number: 1, duration_minutes: 3 })
+      body: JSON.stringify({ course_id: courseCode, class_number: 1, duration_minutes: 5 })
     })
     .then(res => res.json())
 .then(data => {
+
   setQrToken(data.qr_token);
+
   setSessionId(data.session_id);
 
   localStorage.setItem("sessionId", data.session_id);
 
   setLoading(false);
-    })
+
+})
     .catch(err => {
       console.error("Failed to generate session", err);
       setLoading(false);
@@ -51,7 +54,7 @@ export default function SessionMonitor() {
     const interval = setInterval(() => {
      fetch(`https://attendx-6ksy.onrender.com/api/sessions/${sessionId}/scans`)
   .then(res => res.json())
-  .then(data => setScannedStudents(data))
+  .then(data => setLiveScans(data))
   .catch(err => console.error("Poll error", err));
     }, 2000);
     return () => clearInterval(interval);
@@ -173,21 +176,21 @@ export default function SessionMonitor() {
                 <p className="text-sm text-neutral-500 uppercase tracking-widest font-bold text-[10px]">Real-time synchronization active</p>
               </div>
               <div className="text-right">
-                <span className="text-5xl font-bold serif-font">{scannedStudents.length}</span>
+                <span className="text-5xl font-bold serif-font">{liveScans.length}</span>
                 <span className="text-xl text-neutral-400 font-bold serif-font ml-2">/ 60</span>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mt-1">Confirmed Presence</p>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-4 max-h-[500px]">
-              {scannedStudents.length === 0 && !loading && isActive && (
+              {liveScans.length === 0 && !loading && isActive && (
                 <div className="flex flex-col items-center justify-center h-full text-neutral-400 italic">
                   <Loader2 className="w-8 h-8 animate-spin mb-4 opacity-20" />
                   <p>Awaiting first student verification...</p>
                 </div>
               )}
               
-              {scannedStudents.map((s, i) => (
+              {liveScans.map((s, i) => (
                 <div key={i} className="flex justify-between items-center p-6 bg-white border border-[#f0f0eb] rounded-2xl animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-white border border-[#e5e5e0] rounded-full flex items-center justify-center font-bold text-xs">
