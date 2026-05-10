@@ -480,7 +480,7 @@ def refresh_qr(session_id: str):
 
     session["current_nonce"] = nonce
 
-    exp_time = datetime.now(timezone.utc) + timedelta(seconds=5)
+    exp_time = datetime.now(timezone.utc) + timedelta(seconds=7)
 
     qr_token = jwt.encode({
         "session_id": session_id,
@@ -638,10 +638,7 @@ def verify_qr_scan(req: QrScanRequest):
 
         raise HTTPException(
             status_code=409,
-            detail={
-                "status": "already_marked",
-                "message": "Attendance already marked for this session"
-            }
+            detail= "Attendance already marked"
         )
 
     # 8. Find student
