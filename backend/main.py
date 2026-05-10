@@ -480,7 +480,7 @@ def refresh_qr(session_id: str):
 
     session["current_nonce"] = nonce
 
-    exp_time = datetime.now(timezone.utc) + timedelta(seconds=7)
+    exp_time = datetime.now(timezone.utc) + timedelta(seconds=12)
 
     qr_token = jwt.encode({
         "session_id": session_id,
