@@ -7,3 +7,4 @@ qrcode
 PyJWT
 numpy
 opencv-python-headless
+pillow
