@@ -437,6 +437,7 @@ def create_session(req: SessionCreateRequest):
     # Store session metadata for validation (Issue 5)
     active_sessions[session_id] = {
         "current_nonce": nonce,
+        "previous_nonce": None,
         "session_id": session_id,
         "course_id": req.course_id,
         "class_number": req.class_number,
@@ -478,6 +479,7 @@ def refresh_qr(session_id: str):
 
     nonce = secrets.token_hex(8)
 
+    session["previous_nonce"] = session.get("current_nonce")
     session["current_nonce"] = nonce
 
     exp_time = datetime.now(timezone.utc) + timedelta(seconds=15)
@@ -599,11 +601,19 @@ def verify_qr_scan(req: QrScanRequest):
     matched_session = active_sessions[session_id]
 
     # 3. Nonce validation (ANTI-SCREENSHOT)
-    if payload.get("nonce") != matched_session["current_nonce"]:
-        raise HTTPException(
-            status_code=403,
-            detail="QR expired. Please scan latest QR."
-        )
+    
+
+    valid_nonces = [
+    matched_session.get("current_nonce"),
+    matched_session.get("previous_nonce")
+]
+
+    if payload.get("nonce") not in valid_nonces:
+
+     raise HTTPException(
+        status_code=403,
+        detail="QR expired. Please scan latest QR."
+    )
 
     # 5. Validate session active
     if not matched_session["is_active"]:
