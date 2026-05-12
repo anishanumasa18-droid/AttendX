@@ -19,7 +19,7 @@ export default function SessionMonitor() {
          refreshQRCode()
       }
 
-   }, 8000)
+   }, 12000)
 
    return () => clearInterval(qrInterval)
 
@@ -82,7 +82,8 @@ export default function SessionMonitor() {
       )
 
       const data = await res.json()
-
+      console.log("NEW QR TOKEN:", data.qr_token);
+      console.log("NEW NONCE:", data.nonce);
       if(res.ok) {
 
          setQrToken(data.qr_token)
