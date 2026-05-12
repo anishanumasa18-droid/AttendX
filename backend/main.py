@@ -695,7 +695,7 @@ def verify_qr_scan(req: QrScanRequest):
     })
 
     save_student_data()
-
+    print("LATEST QR API RUNNING")
     return {
         "status": "success",
         "message": "Attendance marked successfully",
