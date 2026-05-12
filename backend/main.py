@@ -605,13 +605,6 @@ def verify_qr_scan(req: QrScanRequest):
             detail="QR expired. Please scan latest QR."
         )
 
-    # 4. Verify token matches latest QR
-    if matched_session["qr_token"] != req.qr_token:
-        raise HTTPException(
-            status_code=403,
-            detail="Tampered QR Code rejected"
-        )
-
     # 5. Validate session active
     if not matched_session["is_active"]:
         raise HTTPException(
