@@ -507,7 +507,8 @@ def refresh_qr(session_id: str):
 
     return {
         "qr_code_base64": img_b64,
-        "qr_token": qr_token
+        "qr_token": qr_token,
+        "nonce": nonce
     }
 
 @app.get("/api/sessions/{session_id}/scans")
