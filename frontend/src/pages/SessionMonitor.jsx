@@ -19,7 +19,7 @@ export default function SessionMonitor() {
          refreshQRCode()
       }
 
-   }, 7000)
+   }, 8000)
 
    return () => clearInterval(qrInterval)
 

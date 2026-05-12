@@ -182,85 +182,96 @@ stopFrontCamera();
         {status === 'scanning_qr' && (
           <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative isolate bg-black shadow-inner">
             <Scanner
-              key={`${selectedDeviceId}-${retryCount}`}
-              onScan={async (result) => {
+  key={`${selectedDeviceId}-${retryCount}`}
 
-   if (!result || result.length === 0) return;
+  allowMultiple={false}
+  scanDelay={500}
 
-   try {
+  onScan={async (result) => {
+
+    if (result && result.length > 0) {
 
       const qrToken = result[0].rawValue;
 
       setStatus('verifying');
 
-      const res = await fetch(
-         'https://attendx-6ksy.onrender.com/api/verify/qr_scan',
-         {
+      try {
+
+        const res = await fetch(
+          'https://attendx-6ksy.onrender.com/api/verify/qr_scan',
+          {
             method: 'POST',
             headers: {
-               'Content-Type': 'application/json'
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-               qr_token: qrToken,
-               student_id: userEmail,
-               face_match_score: 0.99
+              qr_token: qrToken,
+              student_id: userEmail,
+              face_match_score: 0.99
             })
-         }
-      );
+          }
+        );
 
-      const data = await res.json();
+        const data = await res.json();
 
-      // SUCCESS
-      if (res.ok) {
+        if (!res.ok) {
 
-         alert("Attendance marked successfully");
+          if (res.status === 409) {
 
-         setStatus('attendance_marked');
+            alert("Attendance already marked");
 
-         stopFrontCamera();
+            setAlreadyMarked(true);
 
-         setTimeout(() => {
-            navigate('/student');
-         }, 2500);
+            stopFrontCamera();
 
-         return;
+            return;
+          }
+
+          throw new Error(data.detail || 'QR verification failed');
+        }
+
+        alert("Attendance marked successfully");
+
+        setStatus('attendance_marked');
+
+        setTimeout(() => navigate('/student'), 2500);
+
+      } catch (err) {
+
+        setQrError(err.message);
+
+        setStatus('scanning_qr');
       }
+    }
+  }}
 
-      // ALREADY MARKED
-      if (res.status === 409) {
+  onError={(error) => {
+    console.log(error);
+  }}
 
-         alert("Attendance already marked");
+  constraints={
+    selectedDeviceId
+      ? { deviceId: selectedDeviceId }
+      : { facingMode: 'environment' }
+  }
 
-         setAlreadyMarked(true);
+  components={{
+    audio: false,
+    finder: true
+  }}
 
-         stopFrontCamera();
+  styles={{
+    container: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#000'
+    },
 
-         return;
-      }
-
-      // OTHER ERRORS
-      alert(data.detail || "QR verification failed");
-
-      setQrError(data.detail || "QR verification failed");
-
-      setStatus('scanning_qr');
-
-   } catch (err) {
-
-      console.error(err);
-
-      alert("Scan failed");
-
-      setQrError(err.message);
-
-      setStatus('scanning_qr');
-   }
-}}
-              onError={(error) => { if (error?.name !== 'NotFoundException') setQrError(`Optical Error: ${error.message}`); }}
-              constraints={selectedDeviceId ? { deviceId: selectedDeviceId } : { facingMode: 'environment' }} 
-              components={{ audio: false, finder: true }}
-              styles={{ container: { width: '100%', height: '100%', backgroundColor: '#000' }, video: { objectFit: 'cover' } }}
-            />
+    video: {
+      objectFit: 'cover'
+    }
+  }}
+/>
             {qrError && (
               <div className="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-12 text-center z-50 animate-in fade-in">
                  <p className="text-rose-500 font-bold serif-font text-xl mb-4">{qrError}</p>
