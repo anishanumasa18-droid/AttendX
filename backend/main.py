@@ -26,6 +26,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from scipy.spatial.distance import cosine
 import bcrypt
+import re
 # Optional DeepFace import
 DEEPFACE_AVAILABLE = False
 try:
@@ -47,11 +48,16 @@ except Exception as e:
 # Create FastAPI app
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 conn = psycopg2.connect(
-    host="localhost",
-    database="attendx",
-    user="postgres",
-    password="Anish@18",
-    port="5432"
+
+    host=os.getenv("dpg-d8612puk1jcs73f6lhlg-a"),
+
+    database=os.getenv("attendx_98o0"),
+
+    user=os.getenv("attendx_user"),
+
+    password=os.getenv("9t5DFf0m9zyXQflu1i1IShgPnTIiaqeq"),
+
+    port=os.getenv("5432")
 )
 
 cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -161,19 +167,17 @@ def signup(req: SignupRequest):
 
     if req.role == "student":
 
-        cursor.execute(
-            "SELECT * FROM students WHERE email=%s",
-            (req.email.lower(),)
+         student_pattern = r"^b\d{2}[a-z]{2}\d{3}@kitsw\.ac\.in$"
+
+    if not re.match(
+        student_pattern,
+        req.email.lower()
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid student institutional email"
         )
-
-        existing_student = cursor.fetchone()
-
-        if existing_student:
-
-            raise HTTPException(
-                status_code=409,
-                detail="Email already registered"
-            )
 
         cursor.execute("""
         INSERT INTO students
@@ -202,20 +206,17 @@ def signup(req: SignupRequest):
 
     elif req.role == "faculty":
 
-        cursor.execute(
-            "SELECT * FROM faculty WHERE email=%s",
-            (req.email.lower(),)
+        faculty_pattern = r"^[a-z]+?\.[a-z]+@kitsw\.ac\.in$"
+
+    if not re.match(
+        faculty_pattern,
+        req.email.lower()
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid faculty institutional email"
         )
-
-        existing_faculty = cursor.fetchone()
-
-        if existing_faculty:
-
-            raise HTTPException(
-                status_code=409,
-                detail="Email already registered"
-            )
-
         cursor.execute("""
         INSERT INTO faculty
         (
@@ -645,7 +646,7 @@ def refresh_qr(session_id: str):
     session["previous_nonce"] = session.get("current_nonce")
     session["current_nonce"] = nonce
 
-    exp_time = datetime.now(timezone.utc) + timedelta(seconds=15)
+    exp_time = datetime.now(timezone.utc) + timedelta(seconds=8)
 
     qr_token = jwt.encode({
         "session_id": session_id,
