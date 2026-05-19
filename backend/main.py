@@ -386,6 +386,8 @@ def register_face(req: RegisterFaceRequest):
         from scipy.spatial.distance import cosine
 
         for s in existing_students:
+            if s["email"] == req.email.lower():
+             continue
 
             existing_embedding = json.loads(s["face_embedding"])
 
@@ -394,7 +396,7 @@ def register_face(req: RegisterFaceRequest):
                 existing_embedding
             )
 
-            if similarity > 0.75:
+            if similarity > 0.82:
 
                 raise HTTPException(
                     status_code=409,
