@@ -35,7 +35,7 @@ const [section, setSection] = useState('1');
          refreshQRCode()
       }
 
-   }, 12000)
+   }, 5000)
 
    return () => clearInterval(qrInterval)
 
