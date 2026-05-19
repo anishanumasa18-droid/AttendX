@@ -9,7 +9,7 @@ if sys.stdout.encoding.lower() != 'utf-8':
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,10 +21,11 @@ import io
 import time
 import json
 import secrets
-import urllib.request
-import urllib.error
 from datetime import datetime, timedelta, timezone
-
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from scipy.spatial.distance import cosine
+import bcrypt
 # Optional DeepFace import
 DEEPFACE_AVAILABLE = False
 try:
@@ -45,7 +46,15 @@ except Exception as e:
 
 # Create FastAPI app
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
+conn = psycopg2.connect(
+    host="localhost",
+    database="attendx",
+    user="postgres",
+    password="Anish@18",
+    port="5432"
+)
 
+cursor = conn.cursor(cursor_factory=RealDictCursor)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
@@ -63,33 +72,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors(), "body": exc.body},
     )
 
-# Load local datasets for development/bypass mode
-student_data = []
-faculty_data = []
-try:
-    student_data_path = os.path.join(BASE_DIR, 'data_student.json')
-    faculty_data_path = os.path.join(BASE_DIR, 'data_faculty.json')
-    if os.path.exists(student_data_path):
-        with open(student_data_path, 'r') as f:
-            student_data = json.load(f)
-    if os.path.exists(faculty_data_path):
-        with open(faculty_data_path, 'r') as f:
-            faculty_data = json.load(f)
-except Exception as e:
-    print(f"Error loading datasets: {e}")
-
 # Global stores for Dataset Mode (Issue 4 & 5)
 active_sessions = {}  # session_id -> metadata
-attendance_records_db = {}  # session_id -> list of student_emails
-session_scans = {} # session_id -> list of scan objects {name, roll, time}
 
-def save_student_data():
-    try:
-        student_data_path = os.path.join(BASE_DIR, 'data_student.json')
-        with open(student_data_path, 'w') as f:
-            json.dump(student_data, f, indent=4)
-    except Exception as e:
-        print(f"Error saving student data: {e}")
+  # session_id -> list of student_emails
+
 
 # CORS
 app.add_middleware(
@@ -100,93 +87,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class SupabaseClient:
-    def __init__(self, url: str, key: str):
-        self.url = url
-        self.key = key
-        self.headers = {
-            "apikey": self.key,
-            "Authorization": f"Bearer {self.key}",
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        }
-
-    def admin_create_user(self, email, password):
-        req = urllib.request.Request(
-            f"{self.url}/auth/v1/admin/users",
-            data=json.dumps({"email": email, "password": password, "email_confirm": True}).encode(),
-            headers=self.headers,
-            method="POST"
-        )
-        try:
-            with urllib.request.urlopen(req) as response:
-                return json.loads(response.read())
-        except urllib.error.HTTPError as e:
-            err = e.read().decode()
-            raise Exception(f"Auth error: {err}")
-            
-    def login_user(self, email, password):
-        req = urllib.request.Request(
-            f"{self.url}/auth/v1/token?grant_type=password",
-            data=json.dumps({"email": email, "password": password}).encode(),
-            headers=self.headers,
-            method="POST"
-        )
-        try:
-            with urllib.request.urlopen(req) as response:
-                return json.loads(response.read())
-        except urllib.error.HTTPError as e:
-            err = e.read().decode()
-            raise Exception(f"Login error: {err}")
-
-    def insert(self, table: str, payload: dict):
-        req = urllib.request.Request(
-            f"{self.url}/rest/v1/{table}",
-            data=json.dumps(payload).encode(),
-            headers=self.headers,
-            method="POST"
-        )
-        try:
-            with urllib.request.urlopen(req) as response:
-                return json.loads(response.read())
-        except urllib.error.HTTPError as e:
-            err = e.read().decode()
-            raise Exception(f"Insert error: {err}")
-            
-    def select_eq(self, table: str, select: str, eq_col: str, eq_val: str):
-        url = f"{self.url}/rest/v1/{table}?select={select}&{eq_col}=eq.{eq_val}"
-        req = urllib.request.Request(url, headers=self.headers, method="GET")
-        try:
-            with urllib.request.urlopen(req) as response:
-                return json.loads(response.read())
-        except urllib.error.HTTPError as e:
-            err = e.read().decode()
-            raise Exception(f"Select error: {err}")
-            
-    def get(self, path: str):
-        url = f"{self.url}/rest/v1/{path}"
-        req = urllib.request.Request(url, headers=self.headers, method="GET")
-        try:
-            with urllib.request.urlopen(req) as response:
-                return json.loads(response.read())
-        except urllib.error.HTTPError as e:
-            err = e.read().decode()
-            raise Exception(f"GET error: {err}")
-
-def get_supabase() -> SupabaseClient:
-    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
-        raise HTTPException(status_code=500, detail="Database credentials missing")
-    return SupabaseClient(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
 @app.get("/")
 def read_root():
-    return {"message": "AttendX API is live and connected to Supabase."}
+
+    cursor.execute("SELECT NOW()")
+
+    current_time = cursor.fetchone()
+
+    return {
+        "message": "AttendX API running",
+        "database": "connected",
+        "time": str(current_time["now"])
+    }
 
 # ======== MODELS ========
 class SessionCreateRequest(BaseModel):
+
     course_id: str
     class_number: int
     duration_minutes: int
+
+    course_code: str
+    course_name: str
+
+    topic: str
+    session_date: str
+    session_time: str
+
+    batch: str
+    session_type: str
+    semester: str
+    branch: str
+    section: str
 
 class VerifyFacePrecheckRequest(BaseModel):
     student_id: str
@@ -222,38 +154,84 @@ class LoginRequest(BaseModel):
 @app.post("/api/auth/signup")
 def signup(req: SignupRequest):
 
+    hashed_password = bcrypt.hashpw(
+        req.password.encode(),
+        bcrypt.gensalt()
+    ).decode()
+
     if req.role == "student":
 
-        new_student = {
-            "Name": req.name,
-            "Institutional Email": req.email,
-            "Roll Number": req.roll_number,
-            "Branch": req.branch,
-            "Section": "A",
-            "Semester": 2,
-            "OS Attendance (2 Months)": "0/0 (0%)",
-            "CN Attendance (2 Months)": "0/0 (0%)",
-            "JAVA Attendance (2 Months)": "0/0 (0%)"
-        }
+        cursor.execute(
+            "SELECT * FROM students WHERE email=%s",
+            (req.email.lower(),)
+        )
 
-        student_data.append(new_student)
+        existing_student = cursor.fetchone()
 
-        save_student_data()
+        if existing_student:
+
+            raise HTTPException(
+                status_code=409,
+                detail="Email already registered"
+            )
+
+        cursor.execute("""
+        INSERT INTO students
+        (
+            name,
+            email,
+            password,
+            roll_number,
+            branch,
+            section,
+            semester
+        )
+
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            req.name,
+            req.email.lower(),
+            hashed_password,
+            req.roll_number,
+            req.branch,
+            req.section,
+            req.semester
+        ))
+
+        conn.commit()
 
     elif req.role == "faculty":
 
-        new_faculty = {
-            "Name": req.name,
-            "Institutional Email": req.email,
-            "Active Courses": "OS,CN,JAVA"
-        }
+        cursor.execute(
+            "SELECT * FROM faculty WHERE email=%s",
+            (req.email.lower(),)
+        )
 
-        faculty_data.append(new_faculty)
+        existing_faculty = cursor.fetchone()
 
-        faculty_data_path = os.path.join(BASE_DIR, 'data_faculty.json')
+        if existing_faculty:
 
-        with open(faculty_data_path, 'w') as f:
-            json.dump(faculty_data, f, indent=4)
+            raise HTTPException(
+                status_code=409,
+                detail="Email already registered"
+            )
+
+        cursor.execute("""
+        INSERT INTO faculty
+        (
+            name,
+            email,
+            password
+        )
+
+        VALUES (%s,%s,%s)
+        """, (
+            req.name,
+            req.email.lower(),
+            hashed_password
+        ))
+
+        conn.commit()
 
     return {
         "message": "Signup successful",
@@ -261,77 +239,113 @@ def signup(req: SignupRequest):
         "email": req.email,
         "user_id": "local_user"
     }
-
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
-    if req.role == 'student':
-        for student in student_data:
-            if student.get('Institutional Email', '').lower() == req.email.lower():
-                return {"message": "Login successful", "role": "student", "email": req.email.lower(), "user_id": "local_student"}
-    elif req.role == 'faculty':
-        for faculty in faculty_data:
-            if faculty.get('Institutional Email', '').lower() == req.email.lower():
-                return {"message": "Login successful", "role": "faculty", "email": req.email.lower(), "user_id": "local_faculty"}
-    
-    raise HTTPException(status_code=401, detail="Email not found in local dataset for the selected role.")
+
+    if req.role == "student":
+
+        cursor.execute(
+            "SELECT * FROM students WHERE email=%s",
+            (req.email.lower(),)
+        )
+
+        student = cursor.fetchone()
+
+        if student:
+
+            password_match = bcrypt.checkpw(
+                req.password.encode(),
+                student["password"].encode()
+            )
+
+            if not password_match:
+
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid password"
+                )
+
+            return {
+                "message": "Login successful",
+                "role": "student",
+                "email": student["email"],
+                "user_id": student["id"]
+            }
+
+    elif req.role == "faculty":
+
+        cursor.execute(
+            "SELECT * FROM faculty WHERE email=%s",
+            (req.email.lower(),)
+        )
+
+        faculty = cursor.fetchone()
+
+        if faculty:
+
+            password_match = bcrypt.checkpw(
+                req.password.encode(),
+                faculty["password"].encode()
+            )
+
+            if not password_match:
+
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid password"
+                )
+
+            return {
+                "message": "Login successful",
+                "role": "faculty",
+                "email": faculty["email"],
+                "user_id": faculty["id"]
+            }
+
+    raise HTTPException(
+        status_code=401,
+        detail="Email not found"
+    )
+
+
 
 @app.get("/api/student/me")
 def get_student_me(email: str):
-    for student in student_data:
-        if student.get('Institutional Email', '').lower() == email.lower():
-            # Check if face is registered locally
-            face_registry_path = os.path.join(BASE_DIR, "face_registry")
-            file_path = os.path.join(face_registry_path, f"{email.lower()}.jpg")
-            student_with_status = student.copy()
-            student_with_status["face_registered"] = os.path.exists(file_path)
-            return student_with_status
-    raise HTTPException(status_code=404, detail="Student not found in dataset")
+
+    cursor.execute(
+        "SELECT * FROM students WHERE email=%s",
+        (email.lower(),)
+    )
+
+    student = cursor.fetchone()
+
+    if not student:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Student not found"
+        )
+
+    return student
 
 @app.get("/api/faculty/me")
 def get_faculty_me(email: str):
-    for faculty in faculty_data:
-        if faculty.get('Institutional Email', '').lower() == email.lower():
-            # Enrich with course stats
-            active_courses = faculty.get('Active Courses', '').split(',')
-            courses_stats = []
-            for c_code in active_courses:
-                c_code = c_code.strip()
-                if not c_code: continue
-                
-                # Calculate stats from student_data
-                course_key = f"{c_code} Attendance (2 Months)"
-                students_in_course = [s for s in student_data if course_key in s]
-                total_enrolled = len(students_in_course)
-                
-                avg_pct = 0
-                total_sessions = 0
-                if total_enrolled > 0:
-                    pcts = []
-                    sessions_list = []
-                    for s in students_in_course:
-                        att_str = s[course_key]
-                        import re
-                        match = re.search(r"(\d+)/(\d+)\s*\((\d+)%\)", att_str)
-                        if match:
-                            sessions_list.append(int(match.group(2)))
-                            pcts.append(int(match.group(3)))
-                    
-                    if pcts:
-                        avg_pct = sum(pcts) // len(pcts)
-                    if sessions_list:
-                        total_sessions = max(sessions_list)
-                
-                courses_stats.append({
-                    "code": c_code,
-                    "enrolled": total_enrolled,
-                    "totalSessions": total_sessions,
-                    "avgAttendance": avg_pct
-                })
-            
-            faculty_with_stats = faculty.copy()
-            faculty_with_stats["courses_stats"] = courses_stats
-            return faculty_with_stats
-    raise HTTPException(status_code=404, detail="Faculty not found in dataset")
+
+    cursor.execute(
+        "SELECT * FROM faculty WHERE email=%s",
+        (email.lower(),)
+    )
+
+    faculty = cursor.fetchone()
+
+    if not faculty:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Faculty not found"
+        )
+
+    return faculty
 
 @app.post("/api/register_face")
 def register_face(req: RegisterFaceRequest):
@@ -354,66 +368,156 @@ def register_face(req: RegisterFaceRequest):
         face_registry_path = os.path.join(BASE_DIR, "face_registry")
         os.makedirs(face_registry_path, exist_ok=True)
         file_path = os.path.join(face_registry_path, f"{safe_email}.jpg")
-        
+        cursor.execute("""
+        SELECT email, face_embedding
+        FROM students
+        WHERE face_embedding IS NOT NULL
+        """)
+
+        existing_students = cursor.fetchall()
         with open(file_path, "wb") as f:
             f.write(img_data)
-            
+        embedding = DeepFace.represent(
+            img_path=file_path,
+            model_name="Facenet512",
+            enforce_detection=True
+        )[0]["embedding"]
+
+        from scipy.spatial.distance import cosine
+
+        for s in existing_students:
+
+            existing_embedding = json.loads(s["face_embedding"])
+
+            similarity = 1 - cosine(
+                embedding,
+                existing_embedding
+            )
+
+            if similarity > 0.75:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Face already registered with {s['email']}"
+                )
+        cursor.execute("""
+                     UPDATE students
+                     SET face_embedding=%s
+                     WHERE email=%s
+                     """, (
+                         json.dumps(embedding),
+                         req.email.lower()
+                        ))
+        conn.commit()
         return {"message": "Face registered successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
 
 @app.post("/api/verify/face_precheck")
 def verify_face_precheck(req: VerifyFacePrecheckRequest):
+
     try:
+
         email = req.student_id.lower()
-        face_registry_path = os.path.join(BASE_DIR, "face_registry")
-        file_path = os.path.join(face_registry_path, f"{email}.jpg")
-        
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Face not registered. Please register your face on the dashboard first.")
-            
+
+        cursor.execute(
+            "SELECT face_embedding FROM students WHERE email=%s",
+            (email,)
+        )
+
+        student = cursor.fetchone()
+
+        if not student or not student["face_embedding"]:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Face embedding not found"
+            )
+
         live_b64 = req.face_image_b64
-        if "," in live_b64: live_b64 = live_b64.split(",")[1]
-        
-        # Add padding
+
+        if "," in live_b64:
+            live_b64 = live_b64.split(",")[1]
+
         live_b64 += "=" * ((4 - len(live_b64) % 4) % 4)
-        
-        match = True
-        score = 0.99
-        
-        if DEEPFACE_AVAILABLE:
-            try:
-                img_stored = cv2.imread(file_path)
-                
-                nparr_live = np.frombuffer(base64.b64decode(live_b64), np.uint8)
-                img_live = cv2.imdecode(nparr_live, cv2.IMREAD_COLOR)
-                
-                result = DeepFace.verify(img_live, img_stored, enforce_detection=True, model_name="Facenet")
-                distance = result.get("distance", 1.0)
-                
-                if distance > settings.DEEPFACE_THRESHOLD:
-                    match = False
-                    score = 1.0 - distance
-                else:
-                    match = True
-                    score = 1.0 - distance
-            except Exception as e:
-                err_msg = str(e).encode('ascii', 'ignore').decode('ascii')
-                print(f"DeepFace processing error: {err_msg}")
-                match = False 
-        else:
-            print("Using safe fallback for face verification.")
-            match = True
-            
-        if not match:
-            raise HTTPException(status_code=403, detail="Face not recognized or spoof detected. Threshold not met.")
-            
-        return {"status": "success", "message": "Face verified successfully", "score": score}
-        
+
+        if not DEEPFACE_AVAILABLE:
+
+            raise HTTPException(
+                status_code=500,
+                detail="Face recognition engine unavailable"
+            )
+
+        nparr_live = np.frombuffer(
+            base64.b64decode(live_b64),
+            np.uint8
+        )
+
+        img_live = cv2.imdecode(
+            nparr_live,
+            cv2.IMREAD_COLOR
+        )
+
+        live_embedding = DeepFace.represent(
+            img_path=img_live,
+            model_name="Facenet512",
+            enforce_detection=True
+        )[0]["embedding"]
+
+        stored_embedding = json.loads(
+            student["face_embedding"]
+        )
+
+        similarity = 1 - cosine(
+            live_embedding,
+            stored_embedding
+        )
+
+        if similarity < 0.75:
+
+            raise HTTPException(
+                status_code=403,
+                detail="Face not recognized"
+            )
+
+        score = similarity
+
+        cursor.execute("""
+        INSERT INTO face_verification_logs
+        (
+            student_email,
+            verification_status,
+            match_score
+        )
+
+        VALUES (%s,%s,%s)
+        """, (
+
+            req.student_id.lower(),
+            "SUCCESS",
+            score
+
+        ))
+
+        conn.commit()
+
+        return {
+            "status": "success",
+            "message": "Face verified successfully",
+            "score": score
+        }
+
     except HTTPException:
         raise
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
 @app.post("/api/sessions/create")
 def create_session(req: SessionCreateRequest):
     now = datetime.now(timezone.utc)
@@ -436,19 +540,76 @@ def create_session(req: SessionCreateRequest):
     
     # Store session metadata for validation (Issue 5)
     active_sessions[session_id] = {
-        "current_nonce": nonce,
-        "previous_nonce": None,
-        "session_id": session_id,
-        "course_id": req.course_id,
-        "class_number": req.class_number,
-        "qr_token": qr_token,
-        "start_time": now,
-        "expires_at": exp_time,
-        "is_active": True
-    }
-    
-    attendance_records_db[session_id] = []
-    session_scans[session_id] = []
+
+    "current_nonce": nonce,
+    "previous_nonce": None,
+
+    "session_id": session_id,
+
+    "course_id": req.course_id,
+
+    "course_code": req.course_code,
+    "course_name": req.course_name,
+
+    "class_number": req.class_number,
+
+    "topic": req.topic,
+    "session_date": req.session_date,
+    "session_time": req.session_time,
+
+    "batch": req.batch,
+    "session_type": req.session_type,
+    "semester": req.semester,
+    "branch": req.branch,
+    "section": req.section,
+
+    "qr_token": qr_token,
+
+    "start_time": now,
+    "expires_at": exp_time,
+
+    "is_active": True
+}
+    cursor.execute("""
+    INSERT INTO sessions
+    (
+        session_id,
+        course_code,
+        course_name,
+        topic,
+        batch,
+        session_type,
+        class_number,
+        session_date,
+        session_time,
+        duration_minutes,
+        qr_token,
+        current_nonce,
+        previous_nonce,
+        is_active
+    )
+
+    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (
+
+        session_id,
+        req.course_code,
+        req.course_name,
+        req.topic,
+        req.batch,
+        req.session_type,
+        req.class_number,
+        req.session_date,
+        req.session_time,
+        req.duration_minutes,
+        qr_token,
+        nonce,
+        None,
+        True
+
+    ))
+
+    conn.commit()    
     
     # Re-generate QR Code with the actual token
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
@@ -504,7 +665,24 @@ def refresh_qr(session_id: str):
     img.save(buf, format="PNG")
 
     img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    cursor.execute("""
+    UPDATE sessions
+    SET
+        current_nonce=%s,
+        previous_nonce=%s,
+        qr_token=%s
 
+    WHERE session_id=%s
+    """, (
+
+        nonce,
+        session.get("previous_nonce"),
+        qr_token,
+        session_id
+
+    ))
+
+    conn.commit()
     return {
         "qr_code_base64": img_b64,
         "qr_token": qr_token,
@@ -513,26 +691,73 @@ def refresh_qr(session_id: str):
 
 @app.get("/api/sessions/{session_id}/scans")
 def get_session_scans(session_id: str):
-    if session_id not in session_scans:
-        return []
-    return session_scans[session_id]
 
+    cursor.execute("""
+    SELECT
+        student_name,
+        roll_number,
+        scanned_at
+
+    FROM live_session_scans
+
+    WHERE session_id=%s
+
+    ORDER BY scanned_at DESC
+    """, (session_id,))
+
+    scans = cursor.fetchall()
+
+    formatted = []
+
+    for s in scans:
+
+        formatted.append({
+            "name": s["student_name"],
+            "roll": s["roll_number"],
+            "time": s["scanned_at"].strftime("%I:%M %p")
+        })
+
+    return formatted
 @app.post("/api/sessions/{session_id}/close")
 def close_session(session_id: str):
+
     if session_id in active_sessions:
+
         active_sessions[session_id]["is_active"] = False
+
+        cursor.execute("""
+        UPDATE sessions
+        SET is_active=FALSE
+        WHERE session_id=%s
+        """, (session_id,))
+
+        conn.commit()
+
         return {"message": "Session closed"}
-    raise HTTPException(status_code=404, detail="Session not found")
+
+    raise HTTPException(
+        status_code=404,
+        detail="Session not found"
+    )
 @app.get("/api/check_attendance_status")
-def check_attendance_status(session_id: str, student_email: str):
+def check_attendance_status(
+    session_id: str,
+    student_email: str
+):
 
-    if session_id not in attendance_records_db:
-        return {"already_marked": False}
+    cursor.execute("""
+    SELECT * FROM attendance
+    WHERE session_id=%s
+    AND student_email=%s
+    """, (
+        session_id,
+        student_email.lower()
+    ))
 
-    already = student_email.lower() in attendance_records_db[session_id]
+    existing = cursor.fetchone()
 
     return {
-        "already_marked": already
+        "already_marked": existing is not None
     }
 @app.get("/test_refresh")
 def test_refresh():
@@ -638,68 +863,121 @@ def verify_qr_scan(req: QrScanRequest):
     # 7. Prevent duplicate attendance
     student_email = req.student_id.lower()
 
-    if student_email in attendance_records_db[session_id]:
+    cursor.execute("""
+    SELECT * FROM attendance
+    WHERE session_id=%s
+    AND student_email=%s
+    """, (
+        session_id,
+        student_email
+    ))
+
+    existing = cursor.fetchone()
+
+    if existing:
 
         raise HTTPException(
             status_code=409,
-            detail= "Attendance already marked"
+            detail="Attendance already marked"
         )
 
     # 8. Find student
-    student_found = None
+        # 8. Find student
 
-    course_key = f"{matched_session['course_id']} Attendance (2 Months)"
+    cursor.execute(
+        "SELECT * FROM students WHERE email=%s",
+        (student_email,)
+    )
 
-    for student in student_data:
-
-        if student.get('Institutional Email', '').lower() == student_email:
-            student_found = student
-            break
+    student_found = cursor.fetchone()
 
     if not student_found:
+
         raise HTTPException(
             status_code=404,
-            detail="Student not found in local dataset"
+            detail="Student not found"
         )
 
-    # 9. Update attendance
-    att_str = student_found.get(course_key, "0/0 (0%)")
+    # 9. Store attendance
 
-    try:
+    cursor.execute("""
+    INSERT INTO attendance
+    (
+        session_id,
+        student_email,
+        face_match_score
+    )
 
-        import re
+    VALUES (%s,%s,%s)
+    """, (
 
-        match = re.search(r"(\d+)/(\d+)", att_str)
+        session_id,
+        student_email,
+        req.face_match_score
 
-        if match:
+    ))
 
-            attended = int(match.group(1)) + 1
-            total = int(match.group(2)) + 1
-
-            percentage = int((attended / total) * 100)
-
-            student_found[course_key] = (
-                f"{attended}/{total} ({percentage}%)"
-            )
-
-    except Exception as e:
-        print(f"Error updating attendance string: {e}")
-
-    # 10. Store attendance
-    attendance_records_db[session_id].append(student_email)
-
+    conn.commit()
     # 11. Live scan updates
-    session_scans[session_id].append({
-        "name": student_found.get("Name", "Unknown"),
-        "roll": student_found.get("Roll Number", "N/A"),
-        "time": datetime.now().strftime("%I:%M %p")
-    })
+    cursor.execute("""
+    INSERT INTO live_session_scans
+    (
+        session_id,
+        student_name,
+        roll_number
+    )
 
-    save_student_data()
+    VALUES (%s,%s,%s)
+    """, (
+
+        session_id,
+        student_found["name"],
+        student_found["roll_number"]
+
+    ))
+
+    conn.commit()
+
+    
     print("LATEST QR API RUNNING")
+    cursor.execute("""
+    INSERT INTO qr_scan_logs
+    (
+        session_id,
+        student_email,
+        scan_status
+    )
+
+    VALUES (%s,%s,%s)
+    """, (
+
+        session_id,
+        student_email,
+        "SUCCESS"
+
+    ))
+
+    conn.commit()
     return {
-        "status": "success",
-        "message": "Attendance marked successfully",
-        "course": matched_session['course_id'],
-        "score": req.face_match_score
-    }
+
+    "status": "success",
+    "message": "Attendance marked successfully",
+
+    "course": matched_session['course_id'],
+
+    "course_code": matched_session["course_code"],
+    "course_name": matched_session["course_name"],
+
+    "topic": matched_session["topic"],
+
+    "session_date": matched_session["session_date"],
+    "session_time": matched_session["session_time"],
+
+    "batch": matched_session["batch"],
+    "semester": matched_session["semester"],
+    "branch": matched_session["branch"],
+    "section": matched_session["section"],
+    "session_type": matched_session["session_type"],
+
+    "score": req.face_match_score
+}
