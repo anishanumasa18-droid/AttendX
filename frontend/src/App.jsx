@@ -7,6 +7,7 @@ import SessionMonitor from './pages/SessionMonitor';
 import Login from './pages/Login';
 import About from './pages/About';
 import AttendanceSuccess from './pages/AttendanceSuccess';
+import RegisterFace from './pages/RegisterFace';
 import logo from './assets/logo_refined.png';
 
 
@@ -53,6 +54,7 @@ function App() {
         <main className="max-w-7xl mx-auto px-6 py-8">
           <Routes>
             <Route path="/login" element={<Login setUser={setUser} />} />
+            <Route path="/register-face" element={<RegisterFace />}/>
             <Route path="/about" element={<About />} />
             <Route path="/student" element={user?.role === 'student' ? <StudentDashboard userEmail={user.email} /> : <Navigate to="/login" />} />
             <Route path="/student/scan" element={user?.role === 'student' ? <FaceScan userEmail={user.email} /> : <Navigate to="/login" />} />

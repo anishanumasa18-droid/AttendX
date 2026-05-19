@@ -61,12 +61,53 @@ export default function Login({ setUser }) {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
+
         // =========================
     // PASSWORD VALIDATION
     // =========================
 
-    const passwordPattern =
-      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+    const passwordValue =
+      password.trim();
+
+    const hasUpper =
+      /[A-Z]/.test(passwordValue);
+
+    const hasLower =
+      /[a-z]/.test(passwordValue);
+
+    const hasNumber =
+      /\d/.test(passwordValue);
+
+    const hasSpecial =
+      /[@$!%*?&]/.test(passwordValue);
+
+    const hasLength =
+      passwordValue.length >= 8;
+
+    if (
+      step === 'signup' &&
+      (
+        !hasUpper ||
+        !hasLower ||
+        !hasNumber ||
+        !hasSpecial ||
+        !hasLength
+      )
+    ) {
+
+      setErrorMsg(
+        'Password must contain:\n' +
+        '• Uppercase letter\n' +
+        '• Lowercase letter\n' +
+        '• Number\n' +
+        '• Special character\n' +
+        '• Minimum 8 characters'
+      );
+
+      setLoading(false);
+
+      return;
+    }
 
     if (
       step === 'signup' &&
@@ -176,24 +217,7 @@ export default function Login({ setUser }) {
       return;
     }
 
-    // =========================
-    // FACE REQUIRED
-    // =========================
-
-    if (
-      role === 'student' &&
-      step === 'signup' &&
-      !faceImage
-    ) {
-
-      setErrorMsg(
-        'Face verification is required'
-      );
-
-      setLoading(false);
-
-      return;
-    }
+    
     try {
       const endpoint =
   step === 'signup'
@@ -252,7 +276,19 @@ export default function Login({ setUser }) {
       }
 
       setUser({ role: data.role || role, email: data.email || email, user_id: data.user_id });
-      navigate(`/${data.role || role}`);
+      if (
+        step === 'signup' &&
+       role === 'student'
+      ) {
+
+  navigate(
+    `/register-face?email=${email}`
+  );
+
+    } else {
+
+    navigate(`/${data.role || role}`);
+   }
     } catch (error) {
       setErrorMsg(error.message);
     } finally {
@@ -344,13 +380,13 @@ export default function Login({ setUser }) {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Full Name</label>
-                  <input type="text" required className="input-field" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} />
+                  <input type="text" required className="input-field" placeholder="Naga Charan Velisoju" value={name} onChange={e => setName(e.target.value)} />
                 </div>
                 {role === 'student' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Roll Number</label>
-                      <input type="text" required className="input-field" placeholder="B24IN001" value={rollNumber} onChange={e => setRollNumber(e.target.value)} />
+                      <input type="text" required className="input-field" placeholder="B24in001" value={rollNumber} onChange={e => setRollNumber(e.target.value)} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Branch</label>
@@ -372,34 +408,10 @@ export default function Login({ setUser }) {
 
             <div>
               <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Password</label>
-              <input type="password" required className="input-field" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+              <input type="password" required className="input-field" placeholder="••••••••" value={password} onChange={e => setPassword( e.target.value.replace(/\s/g, '') ) } />
             </div>
 
-            {step === 'signup' && role === 'student' && (
-              <div className="p-1.5 bg-[#f9f9f5] rounded-2xl border border-[#e5e5e0]">
-                {faceImage ? (
-                  <div className="relative aspect-video rounded-xl overflow-hidden group">
-                    <img src={faceImage} alt="Identity" className="w-full h-full object-cover grayscale-[0.5]" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button type="button" onClick={() => setFaceImage(null)} className="bg-white text-black px-4 py-2 rounded-full text-xs font-bold shadow-xl">Retake Photo</button>
-                    </div>
-                    <div className="absolute bottom-4 left-4 bg-[#c5f82a] text-black px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Identity Captured
-                    </div>
-                  </div>
-                ) : isCameraOpen ? (
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
-                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                    <button type="button" onClick={captureFace} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-2 rounded-full text-xs font-bold shadow-2xl hover:scale-105 transition-transform">Capture Identity</button>
-                  </div>
-                ) : (
-                  <button type="button" onClick={startCamera} className="w-full aspect-video border-2 border-dashed border-[#e5e5e0] rounded-xl flex flex-col items-center justify-center gap-3 text-neutral-400 hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-all bg-white">
-                    <Camera className="w-8 h-8 opacity-40" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Verify Identity via FaceGate</span>
-                  </button>
-                )}
-              </div>
-            )}
+            
 
             <button type="submit" disabled={loading} className="btn-primary mt-4">
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : (step === 'signup' ? 'Create Account' : 'Sign In')}
