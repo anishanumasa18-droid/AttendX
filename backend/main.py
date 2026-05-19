@@ -49,15 +49,15 @@ except Exception as e:
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 conn = psycopg2.connect(
 
-    host=os.getenv("dpg-d8612puk1jcs73f6lhlg-a"),
+    host=os.getenv("DB_HOST"),
 
-    database=os.getenv("attendx_98o0"),
+    database=os.getenv("DB_NAME"),
 
-    user=os.getenv("attendx_user"),
+    user=os.getenv("DB_USER"),
 
-    password=os.getenv("9t5DFf0m9zyXQflu1i1IShgPnTIiaqeq"),
+    password=os.getenv("DB_PASSWORD"),
 
-    port=os.getenv("5432")
+    port=os.getenv("DB_PORT")
 )
 
 cursor = conn.cursor(cursor_factory=RealDictCursor)
