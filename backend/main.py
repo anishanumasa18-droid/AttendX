@@ -26,7 +26,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from scipy.spatial.distance import cosine
 import bcrypt
-import re
 # Optional DeepFace import
 DEEPFACE_AVAILABLE = False
 try:
@@ -148,7 +147,7 @@ class SignupRequest(BaseModel):
     branch: str = None
     section: str = None
     semester: int = None
-    face_image_b64: str = None
+    
 
 class LoginRequest(BaseModel):
     email: str
@@ -160,25 +159,114 @@ class LoginRequest(BaseModel):
 @app.post("/api/auth/signup")
 def signup(req: SignupRequest):
 
+    import re
+
+    # =========================
+    # PASSWORD VALIDATION
+    # =========================
+
+    password_pattern = (
+        r"^(?=.*[A-Z])"
+        r"(?=.*[a-z])"
+        r"(?=.*\d)"
+        r"(?=.*[@$!%*?&])"
+        r"[A-Za-z\d@$!%*?&]{8,}$"
+    )
+
+    if not re.match(
+        password_pattern,
+        req.password
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Password must contain minimum "
+                "8 characters, uppercase, "
+                "lowercase, number and special character"
+            )
+        )
+
     hashed_password = bcrypt.hashpw(
         req.password.encode(),
         bcrypt.gensalt()
     ).decode()
 
+    # =========================
+    # STUDENT SIGNUP
+    # =========================
+
     if req.role == "student":
 
-         student_pattern = r"^b\d{2}[a-z]{2}\d{3}@kitsw\.ac\.in$"
-
-    if not re.match(
-        student_pattern,
-        req.email.lower()
-    ):
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid student institutional email"
+        # EMAIL FORMAT
+        student_email_pattern = (
+            r"^(b\d{2}[a-z]{2}\d{3})"
+            r"@kitsw\.ac\.in$"
         )
 
+        match = re.match(
+            student_email_pattern,
+            req.email.lower()
+        )
+
+        if not match:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Student mail must be in format: "
+                    "b24in001@kitsw.ac.in"
+                )
+            )
+
+        # Extract body before @
+        email_body = match.group(1)
+
+        # ROLL NUMBER FORMAT
+        roll_pattern = (
+            r"^b\d{2}[a-z]{2}\d{3}$"
+        )
+
+        if not re.match(
+            roll_pattern,
+            req.roll_number.lower()
+        ):
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Roll number must be in format: "
+                    "b24in001"
+                )
+            )
+
+        # MATCH EMAIL BODY WITH ROLL
+        if req.roll_number.lower() != email_body:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Roll number must match "
+                    "Domain mail"
+                )
+            )
+
+        # CHECK EXISTING EMAIL
+        cursor.execute(
+            "SELECT * FROM students WHERE email=%s",
+            (req.email.lower(),)
+        )
+
+        existing_student = cursor.fetchone()
+
+        if existing_student:
+
+            raise HTTPException(
+                status_code=409,
+                detail="Student already registered"
+            )
+
+        # INSERT STUDENT
         cursor.execute("""
         INSERT INTO students
         (
@@ -196,7 +284,7 @@ def signup(req: SignupRequest):
             req.name,
             req.email.lower(),
             hashed_password,
-            req.roll_number,
+            req.roll_number.lower(),
             req.branch,
             req.section,
             req.semester
@@ -204,19 +292,44 @@ def signup(req: SignupRequest):
 
         conn.commit()
 
+    # =========================
+    # FACULTY SIGNUP
+    # =========================
+
     elif req.role == "faculty":
 
-        faculty_pattern = r"^[a-z]+?\.[a-z]+@kitsw\.ac\.in$"
-
-    if not re.match(
-        faculty_pattern,
-        req.email.lower()
-    ):
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid faculty institutional email"
+        faculty_pattern = (
+            r"^[a-z]+(\.[a-z]+)?"
+            r"@kitsw\.ac\.in$"
         )
+
+        if not re.match(
+            faculty_pattern,
+            req.email.lower()
+        ):
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Faculty email must be in format: "
+                    "name.cse@kitsw.ac.in"
+                )
+            )
+
+        cursor.execute(
+            "SELECT * FROM faculty WHERE email=%s",
+            (req.email.lower(),)
+        )
+
+        existing_faculty = cursor.fetchone()
+
+        if existing_faculty:
+
+            raise HTTPException(
+                status_code=409,
+                detail="Faculty already registered"
+            )
+
         cursor.execute("""
         INSERT INTO faculty
         (
@@ -234,11 +347,17 @@ def signup(req: SignupRequest):
 
         conn.commit()
 
+    else:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid role"
+        )
+
     return {
         "message": "Signup successful",
         "role": req.role,
-        "email": req.email,
-        "user_id": "local_user"
+        "email": req.email
     }
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
