@@ -245,7 +245,9 @@ stopFrontCamera();
 
     setStatus('attendance_marked');
 
-    setTimeout(() => navigate('/student'), 2500);
+    navigate('/attendance-success', {
+  state: data
+});
 
   } catch (err) {
 

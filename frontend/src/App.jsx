@@ -6,7 +6,9 @@ import FacultyDashboard from './pages/FacultyDashboard';
 import SessionMonitor from './pages/SessionMonitor';
 import Login from './pages/Login';
 import About from './pages/About';
+import AttendanceSuccess from './pages/AttendanceSuccess';
 import logo from './assets/logo_refined.png';
+
 
 function App() {
   const [user, setUser] = useState(null);
@@ -57,6 +59,8 @@ function App() {
             <Route path="/faculty" element={user?.role === 'faculty' ? <FacultyDashboard userEmail={user.email} /> : <Navigate to="/login" />} />
             <Route path="/faculty/session/:id" element={user?.role === 'faculty' ? <SessionMonitor /> : <Navigate to="/login" />} />
             <Route path="*" element={<Navigate to={user ? `/${user.role}` : "/login"} />} />
+            <Route path="/attendance-success" element={<AttendanceSuccess />}
+/>
           </Routes>
         </main>
       </div>
