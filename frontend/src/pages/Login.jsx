@@ -26,7 +26,12 @@ export default function Login({ setUser }) {
     setErrorMsg('');
     try {
       let stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+
+     videoRef.current.srcObject = stream;
+
+     await videoRef.current.play();
+}
       setIsCameraOpen(true);
     } catch (err) {
       setErrorMsg('Camera access failed. Please ensure permissions are granted.');
@@ -56,7 +61,139 @@ export default function Login({ setUser }) {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
+        // =========================
+    // PASSWORD VALIDATION
+    // =========================
 
+    const passwordPattern =
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+
+    if (
+      step === 'signup' &&
+      !passwordPattern.test(password)
+    ) {
+
+      setErrorMsg(
+        'Password must contain uppercase, lowercase, number, special character and minimum 8 characters'
+      );
+
+      setLoading(false);
+
+      return;
+    }
+
+    // =========================
+    // STUDENT EMAIL VALIDATION
+    // =========================
+
+    const studentEmailPattern =
+      /^b\d{2}[a-z]{2}\d{3}@kitsw\.ac\.in$/;
+
+    if (
+      role === 'student' &&
+      step === 'signup' &&
+      !studentEmailPattern.test(
+        email.toLowerCase()
+      )
+    ) {
+
+      setErrorMsg(
+        'Student email must be like b24in001@kitsw.ac.in'
+      );
+
+      setLoading(false);
+
+      return;
+    }
+
+    // =========================
+    // FACULTY EMAIL VALIDATION
+    // =========================
+
+    const facultyPattern =
+      /^[a-z]+(\.[a-z]+)?@kitsw\.ac\.in$/;
+
+    if (
+      role === 'faculty' &&
+      step === 'signup' &&
+      !facultyPattern.test(
+        email.toLowerCase()
+      )
+    ) {
+
+      setErrorMsg(
+        'Faculty email must be like name.cse@kitsw.ac.in'
+      );
+
+      setLoading(false);
+
+      return;
+    }
+
+    // =========================
+    // ROLL NUMBER VALIDATION
+    // =========================
+
+    const rollPattern =
+      /^b\d{2}[a-z]{2}\d{3}$/;
+
+    if (
+      role === 'student' &&
+      step === 'signup' &&
+      !rollPattern.test(
+        rollNumber.toLowerCase()
+      )
+    ) {
+
+      setErrorMsg(
+        'Roll number must be like b24in001'
+      );
+
+      setLoading(false);
+
+      return;
+    }
+
+    // =========================
+    // ROLL ↔ EMAIL MATCH
+    // =========================
+
+    const emailBody =
+      email.split('@')[0].toLowerCase();
+
+    if (
+      role === 'student' &&
+      step === 'signup' &&
+      rollNumber.toLowerCase() !== emailBody
+    ) {
+
+      setErrorMsg(
+        'Roll number must match Domain email'
+      );
+
+      setLoading(false);
+
+      return;
+    }
+
+    // =========================
+    // FACE REQUIRED
+    // =========================
+
+    if (
+      role === 'student' &&
+      step === 'signup' &&
+      !faceImage
+    ) {
+
+      setErrorMsg(
+        'Face verification is required'
+      );
+
+      setLoading(false);
+
+      return;
+    }
     try {
       const endpoint =
   step === 'signup'
@@ -64,10 +201,11 @@ export default function Login({ setUser }) {
     : 'https://attendx-6ksy.onrender.com/api/auth/login';
       const payload = { email, password, role, name };
       if (role === 'student') {
-        payload.roll_number = rollNumber;
-        payload.branch = branch;
-        payload.face_image_b64 = faceImage;
-      }
+
+      payload.roll_number = rollNumber;
+
+     payload.branch = branch;
+}
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -77,6 +215,41 @@ export default function Login({ setUser }) {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Authentication failed');
+            // =========================
+      // FACE REGISTRATION
+      // =========================
+
+      if (
+        step === 'signup' &&
+        role === 'student' &&
+        faceImage
+      ) {
+
+        const faceResponse = await fetch(
+          'https://attendx-6ksy.onrender.com/api/register_face',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email,
+              face_image_b64: faceImage
+            })
+          }
+        );
+
+        const faceData =
+          await faceResponse.json();
+
+        if (!faceResponse.ok) {
+
+          throw new Error(
+            faceData.detail ||
+            'Face registration failed'
+          );
+        }
+      }
 
       setUser({ role: data.role || role, email: data.email || email, user_id: data.user_id });
       navigate(`/${data.role || role}`);
@@ -177,7 +350,7 @@ export default function Login({ setUser }) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Roll Number</label>
-                      <input type="text" required className="input-field" placeholder="23CS101" value={rollNumber} onChange={e => setRollNumber(e.target.value)} />
+                      <input type="text" required className="input-field" placeholder="B24IN001" value={rollNumber} onChange={e => setRollNumber(e.target.value)} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Branch</label>
@@ -190,7 +363,11 @@ export default function Login({ setUser }) {
 
             <div>
               <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Institutional Email</label>
-              <input type="email" required className="input-field" placeholder="name@kitsw.ac.in" value={email} onChange={e => setEmail(e.target.value)} />
+              <input type="email" required className="input-field" placeholder={
+  role === 'student'
+    ? 'b24in001@kitsw.ac.in'
+    : 'name.cse@kitsw.ac.in'
+} value={email} onChange={e => setEmail(e.target.value)} />
             </div>
 
             <div>
