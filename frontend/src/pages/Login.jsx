@@ -109,20 +109,6 @@ export default function Login({ setUser }) {
       return;
     }
 
-    if (
-      step === 'signup' &&
-      !passwordPattern.test(password)
-    ) {
-
-      setErrorMsg(
-        'Password must contain uppercase, lowercase, number, special character and minimum 8 characters'
-      );
-
-      setLoading(false);
-
-      return;
-    }
-
     // =========================
     // STUDENT EMAIL VALIDATION
     // =========================
@@ -380,7 +366,7 @@ export default function Login({ setUser }) {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-neutral-500 mb-2 uppercase tracking-wider text-[10px]">Full Name</label>
-                  <input type="text" required className="input-field" placeholder="Naga Charan Velisoju" value={name} onChange={e => setName(e.target.value)} />
+                  <input type="text" required className="input-field" placeholder={ role === 'faculty' ? 'Dorthi kumar' : 'Nagacharan velisoju' } value={name} onChange={e => setName(e.target.value)} />
                 </div>
                 {role === 'student' && (
                   <div className="grid grid-cols-2 gap-4">

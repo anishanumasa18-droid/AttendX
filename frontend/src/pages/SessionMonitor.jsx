@@ -198,7 +198,9 @@ if (
             <ShieldCheck className="w-4 h-4" />
             <span>Active Session Monitor</span>
           </div>
-          <h2 className="text-5xl font-bold serif-font tracking-tight">Session: {id}</h2>
+          <h2 className="text-5xl font-bold serif-font tracking-tight">
+           Session: {sessionId || 'Not Created'}
+           </h2>
         </div>
         
        

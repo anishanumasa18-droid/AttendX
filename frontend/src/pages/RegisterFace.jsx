@@ -49,7 +49,11 @@ export default function RegisterFace() {
         await navigator
           .mediaDevices
           .getUserMedia({
-            video: true
+            video: {
+            width: 640,
+            height: 480,
+            facingMode: "user"
+}
           });
 
       setStream(mediaStream);
@@ -73,7 +77,19 @@ export default function RegisterFace() {
   const captureFace = async () => {
 
     setLoading(true);
+    if (
+  !videoRef.current ||
+  !videoRef.current.videoWidth
+   )    {
 
+  alert(
+    'Camera not ready yet'
+  );
+
+  setLoading(false);
+
+  return;
+}
     try {
 
       const canvas =
@@ -95,31 +111,46 @@ export default function RegisterFace() {
       );
 
       const faceImage =
-        canvas.toDataURL(
-          'image/jpeg',
-          0.8
-        );
+      canvas
+      .toDataURL(
+      'image/jpeg',
+      0.6
+    )
+    .split(',')[1];
 
-      const response =
-        await fetch(
-          'https://attendx-6ksy.onrender.com/api/register_face',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              email,
-              face_image_b64:
-                faceImage
-            })
-          }
-        );
+      
+      const controller =
+  new AbortController();
 
+const timeout =
+  setTimeout(
+    () => controller.abort(),
+    60000
+  );
+
+const response =
+  await fetch(
+    'https://attendx-6ksy.onrender.com/api/register_face',
+    {
+      method: 'POST',
+
+      headers: {
+        'Content-Type':
+          'application/json'
+      },
+
+      signal: controller.signal,
+
+      body: JSON.stringify({
+        email,
+        face_image_b64:
+          faceImage
+      })
+    }
+  );
       const data =
         await response.json();
-
+        clearTimeout(timeout);
       if (!response.ok) {
 
         throw new Error(
@@ -135,7 +166,12 @@ export default function RegisterFace() {
 
     } catch (err) {
 
-      alert(err.message);
+      console.error(err);
+
+alert(
+  err.message ||
+  'Face registration failed'
+    );
 
     } finally {
 
