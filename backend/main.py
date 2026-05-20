@@ -58,6 +58,10 @@ conn = psycopg2.connect(
 
     port=os.getenv("DB_PORT")
 )
+if DEEPFACE_AVAILABLE:
+    print("Loading FaceNet model...")
+    DeepFace.build_model("Facenet")
+    print("FaceNet model loaded.")
 
 cursor = conn.cursor(cursor_factory=RealDictCursor)
 @app.exception_handler(Exception)
@@ -499,8 +503,8 @@ def register_face(req: RegisterFaceRequest):
             f.write(img_data)
         embedding = DeepFace.represent(
             img_path=file_path,
-            model_name="Facenet512",
-            enforce_detection=True
+            model_name="Facenet",
+            enforce_detection=False
         )[0]["embedding"]
 
         from scipy.spatial.distance import cosine
@@ -533,7 +537,15 @@ def register_face(req: RegisterFaceRequest):
         conn.commit()
         return {"message": "Face registered successfully"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+
+     import traceback
+
+     print(traceback.format_exc())
+
+     raise HTTPException(
+        status_code=500,
+        detail=str(e)
+    )
     
 
 @app.post("/api/verify/face_precheck")
@@ -583,8 +595,8 @@ def verify_face_precheck(req: VerifyFacePrecheckRequest):
 
         live_embedding = DeepFace.represent(
             img_path=img_live,
-            model_name="Facenet512",
-            enforce_detection=True
+            model_name="Facenet",
+            enforce_detection=False
         )[0]["embedding"]
 
         stored_embedding = json.loads(
